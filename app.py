@@ -23,6 +23,7 @@ def download_subtitle(video_url, lang="en"):
 
     command = [
         "yt-dlp",
+        "--cookies", "cookies.txt",
         "--skip-download",
         "--write-sub",
         "--sub-lang", lang,
