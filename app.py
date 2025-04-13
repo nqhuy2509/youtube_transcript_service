@@ -25,8 +25,8 @@ def get_subtitle():
     try:
         ytt_api = YouTubeTranscriptApi(
              proxy_config=WebshareProxyConfig(
-                proxy_username="brd-customer-hl_a63b1cbf-zone-youtube_transcript",
-                proxy_password="1z46rhgu908a",
+                proxy_username="qjxzpgwt",
+                proxy_password="s1jjy2itlljn",
             )
             )
         # Lấy danh sách transcript
