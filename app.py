@@ -21,25 +21,35 @@ def download_subtitle(video_url, lang="en"):
     unique_id = str(uuid.uuid4())
     output_template = os.path.join(temp_dir, unique_id)
 
-    command = [
-        "yt-dlp",
-        "--cookies", "cookies.txt",
-        "--skip-download",
-        "--write-sub",
-        "--sub-lang", lang,
-        "--sub-format", "vtt",
-        "-o", output_template,
-        video_url
-    ]
+    def run_yt_dlp(auto=False):
+        command = [
+            "yt-dlp",
+            "--cookies", "cookies.txt",
+            "--skip-download",
+            "--sub-lang", lang,
+            "--sub-format", "vtt",
+            "-o", output_template,
+            video_url
+        ]
+
+        if auto:
+            command.append("--write-auto-sub")
+        else:
+            command.append("--write-sub")
+
+        return subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    
+    result = run_yt_dlp(auto=False)
+    vtt_path = f"{output_template}.{lang}.vtt"
+
+    # Nếu không tìm thấy, thử phụ đề auto
+    if not os.path.exists(vtt_path):
+        result = run_yt_dlp(auto=True)
+        if not os.path.exists(vtt_path):
+            return None, "Không tìm thấy phụ đề thường hoặc auto trong ngôn ngữ đã chọn."
 
     try:
-        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        vtt_path = f"{output_template}.{lang}.vtt"
-
-        if not os.path.exists(vtt_path):
-            return None, "Subtitle file not found. Maybe this video doesn't have subtitles in the selected language."
-
-        # Chuyển sang srt
         srt_output = ""
         for i, caption in enumerate(webvtt.read(vtt_path)):
             srt_output += f"{i+1}\n"
@@ -47,9 +57,8 @@ def download_subtitle(video_url, lang="en"):
             srt_output += f"{caption.text}\n\n"
 
         os.remove(vtt_path)
-        # Xóa tệp tạm thời
         os.rmdir(temp_dir)
-        # Trả về nội dung SRT
+
         return srt_output, None
 
     except subprocess.CalledProcessError as e:
