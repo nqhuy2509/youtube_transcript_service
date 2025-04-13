@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, Response
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
 from youtube_transcript_api.formatters import SRTFormatter
 import re
-from youtube_transcript_api.proxies import WebshareProxyConfig
+from youtube_transcript_api.proxies import GenericProxyConfig
 
 app = Flask(__name__)
 
@@ -24,10 +24,10 @@ def get_subtitle():
 
     try:
         ytt_api = YouTubeTranscriptApi(
-             proxy_config=WebshareProxyConfig(
-                proxy_username="qjxzpgwt",
-                proxy_password="s1jjy2itlljn",
-            )
+             proxy_config=GenericProxyConfig(
+                 http_url="http://brd-customer-hl_a63b1cbf-zone-youtube_transcript:1z46rhgu908a@brd.superproxy.io:33335",
+                https_url="https://brd-customer-hl_a63b1cbf-zone-youtube_transcript:1z46rhgu908a@brd.superproxy.io:33335",
+                )
             )
         # Lấy danh sách transcript
         transcript_list = ytt_api.list_transcripts(video_id)
