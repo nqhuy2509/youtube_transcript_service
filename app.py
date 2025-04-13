@@ -1,89 +1,63 @@
-import os
-import subprocess
-import uuid
 from flask import Flask, request, jsonify, Response
-import webvtt
+from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
+from youtube_transcript_api.formatters import SRTFormatter
+import re
+from youtube_transcript_api.proxies import WebshareProxyConfig
 
 app = Flask(__name__)
 
-def vtt_to_srt(vtt_file_path):
-    srt_output = ""
-    for i, caption in enumerate(webvtt.read(vtt_file_path)):
-        srt_output += f"{i+1}\n"
-        srt_output += f"{caption.start.replace('.', ',')} --> {caption.end.replace('.', ',')}\n"
-        srt_output += f"{caption.text}\n\n"
-    return srt_output
-
-def download_subtitle(video_url, lang="en"):
-    temp_dir = "temp"
-    os.makedirs(temp_dir, exist_ok=True)
-
-    unique_id = str(uuid.uuid4())
-    output_template = os.path.join(temp_dir, unique_id)
-
-    def run_yt_dlp(auto=False):
-        command = [
-            "yt-dlp",
-            "--cookies", "cookies.txt",
-            "--skip-download",
-            "--sub-lang", lang,
-            "--sub-format", "vtt",
-            "-o", output_template,
-            video_url
-        ]
-
-        if auto:
-            command.append("--write-auto-sub")
-        else:
-            command.append("--write-sub")
-
-        return subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    
-    result = run_yt_dlp(auto=False)
-    vtt_path = f"{output_template}.{lang}.vtt"
-
-    # Nếu không tìm thấy, thử phụ đề auto
-    if not os.path.exists(vtt_path):
-        result = run_yt_dlp(auto=True)
-        if not os.path.exists(vtt_path):
-            return None, "Không tìm thấy phụ đề thường hoặc auto trong ngôn ngữ đã chọn."
-
-    try:
-        srt_output = ""
-        for i, caption in enumerate(webvtt.read(vtt_path)):
-            srt_output += f"{i+1}\n"
-            srt_output += f"{caption.start.replace('.', ',')} --> {caption.end.replace('.', ',')}\n"
-            srt_output += f"{caption.text}\n\n"
-
-        os.remove(vtt_path)
-        os.rmdir(temp_dir)
-
-        return srt_output, None
-
-    except subprocess.CalledProcessError as e:
-        return None, f"yt-dlp error: {e.stderr.decode()}"
-    except Exception as e:
-        return None, str(e)
+def extract_video_id(url_or_id):
+    # Nếu người dùng truyền vào URL, tách ID ra
+    pattern = r"(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})"
+    match = re.search(pattern, url_or_id)
+    return match.group(1) if match else url_or_id
 
 @app.route("/get_subtitle", methods=["GET"])
 def get_subtitle():
-    url = request.args.get("video_url")
-    lang = request.args.get("lang", "en")
+    video = request.args.get("url")
+    lang = request.args.get("lang", "en")  # mặc định tiếng Anh
 
-    if not url:
-        return jsonify({"error": "Missing 'video_url' parameter"}), 400
+    if not video:
+        return jsonify({"error": "Missing 'video_id' parameter"}), 400
 
-    content, error = download_subtitle(url, lang)
+    video_id = extract_video_id(video)
 
-    if error:
-        return jsonify({"error": error}), 500
+    try:
+        ytt_api = YouTubeTranscriptApi(
+             proxy_config=WebshareProxyConfig(
+                proxy_username="qjxzpgwt",
+                proxy_password="s1jjy2itlljn",
+            )
+            )
+        # Lấy danh sách transcript
+        transcript_list = ytt_api.list_transcripts(video_id)
 
-    return Response(content, mimetype="text/plain")
+        try:
+            # Ưu tiên phụ đề người dùng chọn (nếu có)
+            transcript = transcript_list.find_transcript([lang])
+        except:
+            # Nếu không có, lấy phụ đề auto-gen
+            transcript = transcript_list.find_generated_transcript([lang])
+
+        # Lấy nội dung transcript
+        transcript_data = transcript.fetch()
+        formatter = SRTFormatter()
+        srt = formatter.format_transcript(transcript_data)
+
+        return Response(srt, mimetype="text/plain")
+
+    except VideoUnavailable:
+        return jsonify({"error": "Video is unavailable."}), 404
+    except TranscriptsDisabled:
+        return jsonify({"error": "Transcripts are disabled for this video."}), 403
+    except NoTranscriptFound:
+        return jsonify({"error": "No transcript found for this video."}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/")
-def home():
-    return "✅ YouTube Subtitle API (via yt-dlp) is running."
+def index():
+    return "YouTube Transcript API is running."
 
 if __name__ == "__main__":
     app.run(debug=True)
