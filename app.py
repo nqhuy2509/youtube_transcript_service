@@ -2,7 +2,14 @@ from flask import Flask, request, jsonify, Response
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
 from youtube_transcript_api.formatters import SRTFormatter
 import re
-from youtube_transcript_api.proxies import GenericProxyConfig
+from youtube_transcript_api.proxies import WebshareProxyConfig
+from werkzeug.utils import secure_filename
+import os
+import whisper
+import difflib
+
+model = whisper.load_model("base")
+
 
 app = Flask(__name__)
 
@@ -24,10 +31,10 @@ def get_subtitle():
 
     try:
         ytt_api = YouTubeTranscriptApi(
-             proxy_config=GenericProxyConfig(
-                 http_url="http://brd-customer-hl_a63b1cbf-zone-youtube_transcript:1z46rhgu908a@brd.superproxy.io:33335",
-                https_url="https://brd-customer-hl_a63b1cbf-zone-youtube_transcript:1z46rhgu908a@brd.superproxy.io:33335",
-                )
+            #  proxy_config=WebshareProxyConfig(
+            #     proxy_username="qjxzpgwt-rotate",
+            #     proxy_password="s1jjy2itlljn",
+            # )
             )
         # Lấy danh sách transcript
         transcript_list = ytt_api.list_transcripts(video_id)
@@ -52,6 +59,55 @@ def get_subtitle():
         return jsonify({"error": "Transcripts are disabled for this video."}), 403
     except NoTranscriptFound:
         return jsonify({"error": "No transcript found for this video."}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+@app.route("/practice_speaking", methods=["POST"])
+def practice_speaking():
+    if "audio" not in request.files:
+        return jsonify({"error": "Missing audio file"}), 400
+
+    audio_file = request.files["audio"]
+    reference_text = request.form.get("text", "").strip().lower()
+
+    if not reference_text:
+        return jsonify({"error": "Missing reference text"}), 400
+
+    filename = secure_filename(audio_file.filename)
+    filepath = os.path.join("/tmp", filename)
+    audio_file.save(filepath)
+
+    try:
+        result = model.transcribe(filepath, language="en")
+        user_text = result["text"].strip().lower()
+        os.remove(filepath)
+
+        # Bước 1: Tách từ
+        ref_words = reference_text.split()
+        user_words = user_text.split()
+
+        # Bước 2: So sánh từng từ
+        matcher = difflib.SequenceMatcher(None, ref_words, user_words)
+        wrong_words = []
+        correct_count = 0
+
+        for opcode, i1, i2, j1, j2 in matcher.get_opcodes():
+            if opcode == "equal":
+                correct_count += (i2 - i1)
+            elif opcode in ["replace", "delete", "insert"]:
+                wrong_words.extend(ref_words[i1:i2])
+
+        total_words = len(ref_words)
+        accuracy = round(correct_count / total_words * 100, 2) if total_words > 0 else 0.0
+
+        return jsonify({
+            "user_text": user_text,
+            "reference_text": reference_text,
+            "wrong_words": wrong_words,
+            "correct_count": correct_count,
+            "total_words": total_words,
+            "accuracy_percent": accuracy,
+        })
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
