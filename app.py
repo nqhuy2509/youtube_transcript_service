@@ -3,12 +3,12 @@ from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, No
 from youtube_transcript_api.formatters import SRTFormatter
 import re
 from youtube_transcript_api.proxies import WebshareProxyConfig
-from werkzeug.utils import secure_filename
-import os
-import whisper
-import difflib
+# from werkzeug.utils import secure_filename
+# import os
+# import whisper
+# import difflib
 
-model = whisper.load_model("tiny")
+# model = whisper.load_model("tiny")
 
 
 app = Flask(__name__)
@@ -61,55 +61,57 @@ def get_subtitle():
         return jsonify({"error": "No transcript found for this video."}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-@app.route("/practice_speaking", methods=["POST"])
-def practice_speaking():
-    if "audio" not in request.files:
-        return jsonify({"error": "Missing audio file"}), 400
 
-    audio_file = request.files["audio"]
-    reference_text = request.form.get("text", "").strip().lower()
 
-    if not reference_text:
-        return jsonify({"error": "Missing reference text"}), 400
+# @app.route("/practice_speaking", methods=["POST"])
+# def practice_speaking():
+#     if "audio" not in request.files:
+#         return jsonify({"error": "Missing audio file"}), 400
 
-    filename = secure_filename(audio_file.filename)
-    filepath = os.path.join("/tmp", filename)
-    audio_file.save(filepath)
+#     audio_file = request.files["audio"]
+#     reference_text = request.form.get("text", "").strip().lower()
 
-    try:
-        result = model.transcribe(filepath, language="en")
-        user_text = result["text"].strip().lower()
-        os.remove(filepath)
+#     if not reference_text:
+#         return jsonify({"error": "Missing reference text"}), 400
 
-        # Bước 1: Tách từ
-        ref_words = reference_text.split()
-        user_words = user_text.split()
+#     filename = secure_filename(audio_file.filename)
+#     filepath = os.path.join("/tmp", filename)
+#     audio_file.save(filepath)
 
-        # Bước 2: So sánh từng từ
-        matcher = difflib.SequenceMatcher(None, ref_words, user_words)
-        wrong_words = []
-        correct_count = 0
+#     try:
+#         result = model.transcribe(filepath, language="en")
+#         user_text = result["text"].strip().lower()
+#         os.remove(filepath)
 
-        for opcode, i1, i2, j1, j2 in matcher.get_opcodes():
-            if opcode == "equal":
-                correct_count += (i2 - i1)
-            elif opcode in ["replace", "delete", "insert"]:
-                wrong_words.extend(ref_words[i1:i2])
+#         # Bước 1: Tách từ
+#         ref_words = reference_text.split()
+#         user_words = user_text.split()
 
-        total_words = len(ref_words)
-        accuracy = round(correct_count / total_words * 100, 2) if total_words > 0 else 0.0
+#         # Bước 2: So sánh từng từ
+#         matcher = difflib.SequenceMatcher(None, ref_words, user_words)
+#         wrong_words = []
+#         correct_count = 0
 
-        return jsonify({
-            "user_text": user_text,
-            "reference_text": reference_text,
-            "wrong_words": wrong_words,
-            "correct_count": correct_count,
-            "total_words": total_words,
-            "accuracy_percent": accuracy,
-        })
+#         for opcode, i1, i2, j1, j2 in matcher.get_opcodes():
+#             if opcode == "equal":
+#                 correct_count += (i2 - i1)
+#             elif opcode in ["replace", "delete", "insert"]:
+#                 wrong_words.extend(ref_words[i1:i2])
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+#         total_words = len(ref_words)
+#         accuracy = round(correct_count / total_words * 100, 2) if total_words > 0 else 0.0
+
+#         return jsonify({
+#             "user_text": user_text,
+#             "reference_text": reference_text,
+#             "wrong_words": wrong_words,
+#             "correct_count": correct_count,
+#             "total_words": total_words,
+#             "accuracy_percent": accuracy,
+#         })
+
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
 @app.route("/")
 def index():
