@@ -31,10 +31,10 @@ def get_subtitle():
 
     try:
         ytt_api = YouTubeTranscriptApi(
-            #  proxy_config=WebshareProxyConfig(
-            #     proxy_username="qjxzpgwt-rotate",
-            #     proxy_password="s1jjy2itlljn",
-            # )
+             proxy_config=WebshareProxyConfig(
+                proxy_username="qjxzpgwt-rotate",
+                proxy_password="s1jjy2itlljn",
+            )
             )
         # Lấy danh sách transcript
         transcript_list = ytt_api.list_transcripts(video_id)
