@@ -1,2 +1,13 @@
-[tools]
-ffmpeg = "latest"
+[phases.setup]
+nixPkgs = ["ffmpeg", "python310", "gcc"]
+
+[phases.install]
+cmds = [
+  "python -m venv /opt/venv",
+  ". /opt/venv/bin/activate",
+  "pip install --upgrade pip",
+  "pip install -r requirements.txt"
+]
+
+[start]
+cmd = "gunicorn app:app"
