@@ -8,7 +8,7 @@ import os
 import whisper
 import difflib
 
-model = whisper.load_model("base")
+model = whisper.load_model("tiny")
 
 
 app = Flask(__name__)
